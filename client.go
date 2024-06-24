@@ -10,23 +10,34 @@ import (
 
 type QueryResponse struct {
 	Status string `json:"status"`
-	Data   Data
+	Data   Data   `json:"data"`
 }
 
+// JSON response is decoded two times to create Date struct.
+// 1st decode is for populating the Result field.
+// 2nd decode is for populating the ResultScalar/ResultVector/ResultMatrix fields depending on the result type.
+// Format: https://prometheus.io/docs/prometheus/latest/querying/api/#expression-query-result-formats
 type Data struct {
-	ResultType string       `json:"resultType"`
-	Result     []TimeSeries `json:"result"`
+	ResultType string          `json:"resultType"`
+	Result     json.RawMessage `json:"result"`
+
+	ResultScalar []any
+	ResultVector []VectorTimeSeries
+	ResultMatrix []MatrixTimeSeries
 }
 
-type TimeSeries struct {
+type VectorTimeSeries struct {
 	Metric map[string]string `json:"metric"`
 	Point  []any             `json:"value"`
+}
+
+type MatrixTimeSeries struct {
+	Metric map[string]string `json:"metric"`
 	Points [][]any           `json:"values"`
 }
 
 type Client struct {
 	baseURL string
-	// client *http.Client
 }
 
 func NewClient(ctx context.Context, baseURL string) (*Client, error) {
@@ -54,6 +65,29 @@ func (c *Client) Query(q string) (*QueryResponse, error) {
 	var qr QueryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&qr); err != nil {
 		return nil, err
+	}
+
+	switch qr.Data.ResultType {
+	case "scalar":
+		var resultScalar []any
+		if err := json.Unmarshal(qr.Data.Result, &resultScalar); err != nil {
+			return nil, err
+		}
+		qr.Data.ResultScalar = resultScalar
+	case "vector":
+		var resultVector []VectorTimeSeries
+		if err := json.Unmarshal(qr.Data.Result, &resultVector); err != nil {
+			return nil, err
+		}
+		qr.Data.ResultVector = resultVector
+	case "matrix":
+		var resultMatrix []MatrixTimeSeries
+		if err := json.Unmarshal(qr.Data.Result, &resultMatrix); err != nil {
+			return nil, err
+		}
+		qr.Data.ResultMatrix = resultMatrix
+	default:
+		return nil, fmt.Errorf("unsupported result type: %q", qr.Data.ResultType)
 	}
 
 	return &qr, nil

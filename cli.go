@@ -172,28 +172,61 @@ func buildQueryResult(qr *QueryResponse) *Result {
 		return &result
 	}
 
-	// Add header columns.
-	result.Header = append(result.Header, "timestamp")
-	firstTimeSeries := qr.Data.Result[0]
-	for labelName := range firstTimeSeries.Metric {
-		result.Header = append(result.Header, labelName)
-	}
-	result.Header = append(result.Header, "value")
+	if qr.Data.ResultType == "scalar" {
+		// Add header columns.
+		result.Header = []string{"timestamp", "value"}
 
-	// Add rows.
-	for _, timeseries := range qr.Data.Result {
-		if qr.Data.ResultType == "vector" {
+		// Add row.
+		timestamp := qr.Data.ResultScalar[0].(float64)
+		value := qr.Data.ResultScalar[1].(string)
+		result.Rows = []Row{{Columns: []string{formatTimestamp(timestamp), value}}}
+		return &result
+	}
+
+	if qr.Data.ResultType == "vector" {
+		if len(qr.Data.ResultVector) == 0 {
+			return &result
+		}
+
+		// Add header columns.
+		result.Header = []string{"timestamp"}
+		firstTimeSeries := qr.Data.ResultVector[0]
+		for labelName := range firstTimeSeries.Metric {
+			result.Header = append(result.Header, labelName)
+		}
+		result.Header = append(result.Header, "value")
+
+		// Add rows.
+		for _, timeseries := range qr.Data.ResultVector {
+			var row Row
 			timestamp := timeseries.Point[0].(float64)
 			value := timeseries.Point[1].(string)
 
-			var row Row
 			row.Columns = append(row.Columns, formatTimestamp(timestamp))
 			for _, labelName := range sortedLabelNames(timeseries.Metric) {
 				row.Columns = append(row.Columns, timeseries.Metric[labelName])
 			}
 			row.Columns = append(row.Columns, value)
 			result.Rows = append(result.Rows, row)
-		} else if qr.Data.ResultType == "matrix" {
+		}
+		return &result
+	}
+
+	if qr.Data.ResultType == "matrix" {
+		if len(qr.Data.ResultMatrix) == 0 {
+			return &result
+		}
+
+		// Add header columns.
+		result.Header = []string{"timestamp"}
+		firstTimeSeries := qr.Data.ResultMatrix[0]
+		for labelName := range firstTimeSeries.Metric {
+			result.Header = append(result.Header, labelName)
+		}
+		result.Header = append(result.Header, "value")
+
+		// Add rows.
+		for _, timeseries := range qr.Data.ResultMatrix {
 			for _, point := range timeseries.Points {
 				timestamp := point[0].(float64)
 				value := point[1].(string)
@@ -207,7 +240,10 @@ func buildQueryResult(qr *QueryResponse) *Result {
 				result.Rows = append(result.Rows, row)
 			}
 		}
+		return &result
 	}
+
+	// Unreachable.
 	return &result
 }
 
