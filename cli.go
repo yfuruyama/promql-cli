@@ -19,23 +19,27 @@ const (
 	defaultPrompt = "promql> "
 )
 
-type Cli struct {
-	url     string
-	project string
-	in      io.ReadCloser
-	out     io.Writer
+type CLI struct {
+	client *Client
+	in     io.ReadCloser
+	out    io.Writer
 }
 
-func NewCli(url, project string, in io.ReadCloser, out io.Writer) (*Cli, error) {
-	return &Cli{
-		url:     url,
-		project: project,
-		in:      in,
-		out:     out,
+func NewCLI(url, project, headers string, in io.ReadCloser, out io.Writer) (*CLI, error) {
+	ctx := context.Background()
+	client, err := NewClient(ctx, url, project, headers)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CLI{
+		client: client,
+		in:     in,
+		out:    out,
 	}, nil
 }
 
-func (c *Cli) RunInteractive() int {
+func (c *CLI) RunInteractive() int {
 	rl, err := readline.NewEx(&readline.Config{
 		Stdin:       c.in,
 		HistoryFile: "/tmp/promql_cli_history",
@@ -44,12 +48,6 @@ func (c *Cli) RunInteractive() int {
 		return c.ExitOnError(err)
 	}
 	rl.SetPrompt(defaultPrompt)
-
-	ctx := context.Background()
-	client, err := NewClient(ctx, c.url, c.project)
-	if err != nil {
-		return c.ExitOnError(err)
-	}
 
 	for {
 		input, err := c.ReadInput(rl)
@@ -65,7 +63,7 @@ func (c *Cli) RunInteractive() int {
 		}
 
 		stop := c.PrintProgressingMark()
-		resp, err := client.Query(input)
+		resp, err := c.client.Query(input)
 		stop()
 		if err != nil {
 			c.PrintInteractiveError(err)
@@ -91,7 +89,7 @@ func (c *Cli) RunInteractive() int {
 	}
 }
 
-func (c *Cli) ReadInput(rl *readline.Instance) (string, error) {
+func (c *CLI) ReadInput(rl *readline.Instance) (string, error) {
 	defer rl.SetPrompt(defaultPrompt)
 
 	var input string
@@ -124,21 +122,21 @@ func (c *Cli) ReadInput(rl *readline.Instance) (string, error) {
 	}
 }
 
-func (c *Cli) Exit() int {
+func (c *CLI) Exit() int {
 	fmt.Fprintln(c.out, "Bye")
 	return exitCodeSuccess
 }
 
-func (c *Cli) ExitOnError(err error) int {
+func (c *CLI) ExitOnError(err error) int {
 	fmt.Fprintf(c.out, "ERROR: %s\n", err)
 	return exitCodeError
 }
 
-func (c *Cli) PrintInteractiveError(err error) {
+func (c *CLI) PrintInteractiveError(err error) {
 	fmt.Fprintf(c.out, "ERROR: %s\n", err)
 }
 
-func (c *Cli) PrintProgressingMark() func() {
+func (c *CLI) PrintProgressingMark() func() {
 	progressMarks := []string{`-`, `\`, `|`, `/`}
 	ticker := time.NewTicker(time.Millisecond * 100)
 	go func() {
