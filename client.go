@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+
+	"golang.org/x/oauth2/google"
 )
 
 type QueryResponse struct {
@@ -38,25 +40,40 @@ type MatrixTimeSeries struct {
 
 type Client struct {
 	baseURL string
+	client  *http.Client
 }
 
-func NewClient(ctx context.Context, baseURL string) (*Client, error) {
+func NewClient(ctx context.Context, baseURL string, projectID string) (*Client, error) {
+	httpClient := http.DefaultClient
+
+	// For Google Cloud Monitoring
+	if projectID != "" {
+		baseURL = fmt.Sprintf("https://monitoring.googleapis.com/v1/projects/%s/location/global/prometheus", projectID)
+		googleClient, err := google.DefaultClient(context.Background(), "https://www.googleapis.com/auth/cloud-platform")
+		if err != nil {
+			return nil, err
+		}
+		httpClient = googleClient
+	}
+
+	if _, err := url.Parse(baseURL); err != nil {
+		return nil, fmt.Errorf("invalid base URL: %v", err)
+	}
+
 	return &Client{
 		baseURL: baseURL,
+		client:  httpClient,
 	}, nil
 }
 
 func (c *Client) Query(q string) (*QueryResponse, error) {
-	u, err := url.Parse(c.baseURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid base URL: %v", err)
-	}
-	u.Path = "/api/v1/query"
+	u, _ := url.Parse(c.baseURL) // ignore error since baseURL is already validated
+	u = u.JoinPath("/api/v1/query")
 	queryParams := url.Values{}
 	queryParams.Add("query", q)
 	u.RawQuery = queryParams.Encode()
 
-	resp, err := http.Get(u.String())
+	resp, err := c.client.Get(u.String())
 	if err != nil {
 		return nil, err
 	}

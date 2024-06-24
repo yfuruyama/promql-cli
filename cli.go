@@ -20,16 +20,18 @@ const (
 )
 
 type Cli struct {
-	url string
-	in  io.ReadCloser
-	out io.Writer
+	url     string
+	project string
+	in      io.ReadCloser
+	out     io.Writer
 }
 
-func NewCli(url string, in io.ReadCloser, out io.Writer) (*Cli, error) {
+func NewCli(url, project string, in io.ReadCloser, out io.Writer) (*Cli, error) {
 	return &Cli{
-		url: url,
-		in:  in,
-		out: out,
+		url:     url,
+		project: project,
+		in:      in,
+		out:     out,
 	}, nil
 }
 
@@ -44,7 +46,7 @@ func (c *Cli) RunInteractive() int {
 	rl.SetPrompt(defaultPrompt)
 
 	ctx := context.Background()
-	client, err := NewClient(ctx, c.url)
+	client, err := NewClient(ctx, c.url, c.project)
 	if err != nil {
 		return c.ExitOnError(err)
 	}
