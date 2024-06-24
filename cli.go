@@ -190,10 +190,7 @@ func buildQueryResult(qr *QueryResponse) *Result {
 
 		// Add header columns.
 		result.Header = []string{"timestamp"}
-		firstTimeSeries := qr.Data.ResultVector[0]
-		for labelName := range firstTimeSeries.Metric {
-			result.Header = append(result.Header, labelName)
-		}
+		result.Header = append(result.Header, sortedLabelNames(qr.Data.ResultVector[0].Metric)...)
 		result.Header = append(result.Header, "value")
 
 		// Add rows.
@@ -219,10 +216,7 @@ func buildQueryResult(qr *QueryResponse) *Result {
 
 		// Add header columns.
 		result.Header = []string{"timestamp"}
-		firstTimeSeries := qr.Data.ResultMatrix[0]
-		for labelName := range firstTimeSeries.Metric {
-			result.Header = append(result.Header, labelName)
-		}
+		result.Header = append(result.Header, sortedLabelNames(qr.Data.ResultMatrix[0].Metric)...)
 		result.Header = append(result.Header, "value")
 
 		// Add rows.
