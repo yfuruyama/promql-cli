@@ -82,7 +82,7 @@ func (c *CLI) RunInteractive() int {
 			}
 			table.SetHeader(result.Header)
 			table.Render()
-			fmt.Fprintf(c.out, "%d points in result\n\n", len(result.Rows))
+			fmt.Fprintf(c.out, "%d values in result\n\n", len(result.Rows))
 		} else {
 			fmt.Fprintf(c.out, "Empty result\n\n")
 		}

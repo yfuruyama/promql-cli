@@ -32,7 +32,7 @@ promql> up
 +-------------------------------+----------+--------------+----------------+-------+
 | 2024-06-25T14:16:37.171+09:00 | up       | otelcol:8888 | otel-collector | 1     |
 +-------------------------------+----------+--------------+----------------+-------+
-1 points in result
+1 values in result
 
 promql> max(histogram_quantile(0.99, http_client_duration_milliseconds_bucket{job="loadgenerator"}))
 +-------------------------------+-------+
@@ -40,7 +40,7 @@ promql> max(histogram_quantile(0.99, http_client_duration_milliseconds_bucket{jo
 +-------------------------------+-------+
 | 2024-06-25T14:25:22.206+09:00 | 10000 |
 +-------------------------------+-------+
-1 points in result
+1 values in result
 ```
 
 Run PromQL queries against Google Cloud Monitoring.
@@ -53,5 +53,5 @@ promql> max(storage_googleapis_com:storage_object_count)
 +-------------------------------+-------+
 | 2024-06-25T14:28:36.454+09:00 | 31    |
 +-------------------------------+-------+
-1 points in result
+1 values in result
 ```
