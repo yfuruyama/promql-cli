@@ -70,19 +70,19 @@ func (c *CLI) RunInteractive() int {
 			continue
 		}
 
-		result := buildQueryResult(resp)
-		if len(result.Rows) > 0 {
-			table := tablewriter.NewWriter(c.out)
-			table.SetAutoFormatHeaders(false)
-			table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-			table.SetAlignment(tablewriter.ALIGN_LEFT)
-			table.SetAutoWrapText(false)
-			for _, row := range result.Rows {
-				table.Append(row.Columns)
+		table := buildTable(resp)
+		if len(table.Rows) > 0 {
+			w := tablewriter.NewWriter(c.out)
+			w.SetAutoFormatHeaders(false)
+			w.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+			w.SetAlignment(tablewriter.ALIGN_LEFT)
+			w.SetAutoWrapText(false)
+			for _, row := range table.Rows {
+				w.Append(row.Columns)
 			}
-			table.SetHeader(result.Header)
-			table.Render()
-			fmt.Fprintf(c.out, "%d values in result\n\n", len(result.Rows))
+			w.SetHeader(table.Header)
+			w.Render()
+			fmt.Fprintf(c.out, "%d values in result\n\n", len(table.Rows))
 		} else {
 			fmt.Fprintf(c.out, "Empty result\n\n")
 		}
@@ -139,7 +139,7 @@ func (c *CLI) PrintProgressingMark() func() {
 	return stop
 }
 
-type Result struct {
+type Table struct {
 	Header []string
 	Rows   []Row
 }
@@ -148,47 +148,44 @@ type Row struct {
 	Columns []string
 }
 
-func buildQueryResult(qr *QueryResponse) *Result {
-	result := Result{}
+func buildTable(qr *QueryResponse) *Table {
+	table := Table{}
 
-	if len(qr.Data.Result) == 0 {
-		return &result
+	if len(qr.Data.ResultRaw) == 0 {
+		return &table
 	}
 
-	if qr.Data.ResultType == "scalar" {
+	switch result := qr.Data.Result.(type) {
+	case ResultScalar:
 		// Add header columns.
-		result.Header = []string{"timestamp", "value"}
+		table.Header = []string{"timestamp", "value"}
 
 		// Add row.
-		timestamp := qr.Data.ResultScalar[0].(float64)
-		value := qr.Data.ResultScalar[1].(string)
-		result.Rows = []Row{{Columns: []string{formatTimestamp(timestamp), value}}}
-		return &result
-	}
-
-	if qr.Data.ResultType == "string" {
+		timestamp := result[0].(float64)
+		value := result[1].(string)
+		table.Rows = []Row{{Columns: []string{formatTimestamp(timestamp), value}}}
+		return &table
+	case ResultString:
 		// Add header columns.
-		result.Header = []string{"timestamp", "value"}
+		table.Header = []string{"timestamp", "value"}
 
 		// Add row.
-		timestamp := qr.Data.ResultString[0].(float64)
-		value := qr.Data.ResultString[1].(string)
-		result.Rows = []Row{{Columns: []string{formatTimestamp(timestamp), value}}}
-		return &result
-	}
-
-	if qr.Data.ResultType == "vector" {
-		if len(qr.Data.ResultVector) == 0 {
-			return &result
+		timestamp := result[0].(float64)
+		value := result[1].(string)
+		table.Rows = []Row{{Columns: []string{formatTimestamp(timestamp), value}}}
+		return &table
+	case ResultVector:
+		if len(result) == 0 {
+			return &table
 		}
 
 		// Add header columns.
-		result.Header = []string{"timestamp"}
-		result.Header = append(result.Header, sortedLabelNames(qr.Data.ResultVector[0].Metric)...)
-		result.Header = append(result.Header, "value")
+		table.Header = []string{"timestamp"}
+		table.Header = append(table.Header, sortedLabelNames(result[0].Metric)...)
+		table.Header = append(table.Header, "value")
 
 		// Add rows.
-		for _, timeseries := range qr.Data.ResultVector {
+		for _, timeseries := range result {
 			var row Row
 			timestamp := timeseries.Point[0].(float64)
 			value := timeseries.Point[1].(string)
@@ -198,23 +195,21 @@ func buildQueryResult(qr *QueryResponse) *Result {
 				row.Columns = append(row.Columns, timeseries.Metric[labelName])
 			}
 			row.Columns = append(row.Columns, value)
-			result.Rows = append(result.Rows, row)
+			table.Rows = append(table.Rows, row)
 		}
-		return &result
-	}
-
-	if qr.Data.ResultType == "matrix" {
-		if len(qr.Data.ResultMatrix) == 0 {
-			return &result
+		return &table
+	case ResultMatrix:
+		if len(result) == 0 {
+			return &table
 		}
 
 		// Add header columns.
-		result.Header = []string{"timestamp"}
-		result.Header = append(result.Header, sortedLabelNames(qr.Data.ResultMatrix[0].Metric)...)
-		result.Header = append(result.Header, "value")
+		table.Header = []string{"timestamp"}
+		table.Header = append(table.Header, sortedLabelNames(result[0].Metric)...)
+		table.Header = append(table.Header, "value")
 
 		// Add rows.
-		for _, timeseries := range qr.Data.ResultMatrix {
+		for _, timeseries := range result {
 			for _, point := range timeseries.Points {
 				timestamp := point[0].(float64)
 				value := point[1].(string)
@@ -225,14 +220,14 @@ func buildQueryResult(qr *QueryResponse) *Result {
 					row.Columns = append(row.Columns, timeseries.Metric[labelName])
 				}
 				row.Columns = append(row.Columns, value)
-				result.Rows = append(result.Rows, row)
+				table.Rows = append(table.Rows, row)
 			}
 		}
-		return &result
+		return &table
+	default:
+		// Unreachable.
+		return &table
 	}
-
-	// Unreachable.
-	return &result
 }
 
 func sortedLabelNames(labels map[string]string) []string {

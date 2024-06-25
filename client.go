@@ -19,18 +19,20 @@ type QueryResponse struct {
 }
 
 // JSON response is decoded two times to create Date struct.
-// 1st decode is for populating the Result field.
-// 2nd decode is for populating the ResultScalar/ResultVector/ResultMatrix fields depending on the result type.
+// 1st decode is for populating the ResultRaw field.
+// 2nd decode is for populating the Result field depending on the result type.
 // Format: https://prometheus.io/docs/prometheus/latest/querying/api/#expression-query-result-formats
 type Data struct {
 	ResultType string          `json:"resultType"`
-	Result     json.RawMessage `json:"result"`
-
-	ResultScalar []any
-	ResultString []any
-	ResultVector []VectorTimeSeries
-	ResultMatrix []MatrixTimeSeries
+	ResultRaw  json.RawMessage `json:"result"`
+	// Result could contain either ResultScalar, ResultString, ResultVector, or ResultMatrix.
+	Result any `json:"-"`
 }
+
+type ResultScalar []any
+type ResultString []any
+type ResultVector []VectorTimeSeries
+type ResultMatrix []MatrixTimeSeries
 
 type VectorTimeSeries struct {
 	Metric map[string]string `json:"metric"`
@@ -111,29 +113,29 @@ func (c *Client) Query(q string) (*QueryResponse, error) {
 
 	switch qr.Data.ResultType {
 	case "scalar":
-		var resultScalar []any
-		if err := json.Unmarshal(qr.Data.Result, &resultScalar); err != nil {
+		var result ResultScalar
+		if err := json.Unmarshal(qr.Data.ResultRaw, &result); err != nil {
 			return nil, err
 		}
-		qr.Data.ResultScalar = resultScalar
+		qr.Data.Result = result
 	case "string":
-		var resultString []any
-		if err := json.Unmarshal(qr.Data.Result, &resultString); err != nil {
+		var result ResultString
+		if err := json.Unmarshal(qr.Data.ResultRaw, &result); err != nil {
 			return nil, err
 		}
-		qr.Data.ResultString = resultString
+		qr.Data.Result = result
 	case "vector":
-		var resultVector []VectorTimeSeries
-		if err := json.Unmarshal(qr.Data.Result, &resultVector); err != nil {
+		var result ResultVector
+		if err := json.Unmarshal(qr.Data.ResultRaw, &result); err != nil {
 			return nil, err
 		}
-		qr.Data.ResultVector = resultVector
+		qr.Data.Result = result
 	case "matrix":
-		var resultMatrix []MatrixTimeSeries
-		if err := json.Unmarshal(qr.Data.Result, &resultMatrix); err != nil {
+		var result ResultMatrix
+		if err := json.Unmarshal(qr.Data.ResultRaw, &result); err != nil {
 			return nil, err
 		}
-		qr.Data.ResultMatrix = resultMatrix
+		qr.Data.Result = result
 	default:
 		return nil, fmt.Errorf("unsupported result type: %q", qr.Data.ResultType)
 	}
