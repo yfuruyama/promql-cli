@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -14,6 +15,7 @@ import (
 type QueryResponse struct {
 	Status string `json:"status"`
 	Data   Data   `json:"data"`
+	Error  string `json:"error"`
 }
 
 // JSON response is decoded two times to create Date struct.
@@ -25,6 +27,7 @@ type Data struct {
 	Result     json.RawMessage `json:"result"`
 
 	ResultScalar []any
+	ResultString []any
 	ResultVector []VectorTimeSeries
 	ResultMatrix []MatrixTimeSeries
 }
@@ -102,6 +105,10 @@ func (c *Client) Query(q string) (*QueryResponse, error) {
 		return nil, err
 	}
 
+	if qr.Status == "error" {
+		return nil, errors.New(qr.Error)
+	}
+
 	switch qr.Data.ResultType {
 	case "scalar":
 		var resultScalar []any
@@ -109,6 +116,12 @@ func (c *Client) Query(q string) (*QueryResponse, error) {
 			return nil, err
 		}
 		qr.Data.ResultScalar = resultScalar
+	case "string":
+		var resultString []any
+		if err := json.Unmarshal(qr.Data.Result, &resultString); err != nil {
+			return nil, err
+		}
+		qr.Data.ResultString = resultString
 	case "vector":
 		var resultVector []VectorTimeSeries
 		if err := json.Unmarshal(qr.Data.Result, &resultVector); err != nil {

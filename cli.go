@@ -183,6 +183,17 @@ func buildQueryResult(qr *QueryResponse) *Result {
 		return &result
 	}
 
+	if qr.Data.ResultType == "string" {
+		// Add header columns.
+		result.Header = []string{"timestamp", "value"}
+
+		// Add row.
+		timestamp := qr.Data.ResultString[0].(float64)
+		value := qr.Data.ResultString[1].(string)
+		result.Rows = []Row{{Columns: []string{formatTimestamp(timestamp), value}}}
+		return &result
+	}
+
 	if qr.Data.ResultType == "vector" {
 		if len(qr.Data.ResultVector) == 0 {
 			return &result
@@ -246,7 +257,28 @@ func sortedLabelNames(labels map[string]string) []string {
 	for l := range labels {
 		labelNames = append(labelNames, l)
 	}
-	sort.Strings(labelNames)
+	sort.Slice(labelNames, func(i, j int) bool {
+		labelI := labelNames[i]
+		labelJ := labelNames[j]
+
+		// metric name should be at leftmost
+		if labelI == "__name__" {
+			return true
+		}
+		if labelJ == "__name__" {
+			return false
+		}
+
+		// "le", which is used for histogram metrics, should be at rightmost
+		if labelI == "le" {
+			return false
+		}
+		if labelJ == "le" {
+			return true
+		}
+
+		return sort.StringsAreSorted([]string{labelI, labelJ})
+	})
 	return labelNames
 }
 

@@ -1,9 +1,3 @@
 promql-cli
 ===
-Yet another CLI for running PromQL.
-
-TODO:
-
-- histogram
-- refactoring
-- update README
+Yet another CLI for running PromQL with Prometheus Query API.
