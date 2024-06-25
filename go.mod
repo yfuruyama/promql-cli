@@ -1,4 +1,4 @@
-module promqlcli
+module promql-cli
 
 go 1.22.3
 
