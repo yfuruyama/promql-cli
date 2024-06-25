@@ -92,8 +92,6 @@ func (c *CLI) RunInteractive() int {
 func (c *CLI) ReadInput(rl *readline.Instance) (string, error) {
 	defer rl.SetPrompt(defaultPrompt)
 
-	var input string
-	var multiline bool
 	for {
 		line, err := rl.Readline()
 		if err != nil {
@@ -103,22 +101,7 @@ func (c *CLI) ReadInput(rl *readline.Instance) (string, error) {
 			continue
 		}
 
-		line = strings.TrimSpace(line)
-
-		// multiline
-		if strings.HasSuffix(line, `\`) {
-			input += strings.TrimSuffix(line, `\`)
-			rl.SetPrompt("  -> ")
-			multiline = true
-			continue
-		}
-
-		input += line
-		if multiline {
-			// Save multi-line input as single-line input into the history
-			rl.SaveHistory(input)
-		}
-		return input, nil
+		return strings.TrimSpace(line), nil
 	}
 }
 
