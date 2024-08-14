@@ -210,7 +210,9 @@ func buildTable(qr *QueryResponse) *Table {
 
 		// Add rows.
 		for _, timeseries := range result {
-			for _, point := range timeseries.Points {
+			// Iterate in reverse order to show the result descendendly in timestamp.
+			for i := len(timeseries.Points) - 1; i >= 0; i-- {
+				point := timeseries.Points[i]
 				timestamp := point[0].(float64)
 				value := point[1].(string)
 
